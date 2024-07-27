@@ -99,15 +99,11 @@ class ScanTagPageState extends State<ScanTagPage> {
   }
 
   Future<Map<String, dynamic>> _startNfcScan() async {
-    try {
-      final tag = await _nfcService.startNfcSession();
-      if (tag != null) {
-        return await _nfcService.readTagData();
-      } else {
-        return {'data': 'No tag detected.'};
-      }
-    } catch (e) {
-      return {'data': 'Error: $e'};
+    final tag = await _nfcService.startNfcSession();
+    if (tag != null) {
+      return await _nfcService.readTagData();
+    } else {
+      return {'data': 'No tag detected.'};
     }
   }
 }

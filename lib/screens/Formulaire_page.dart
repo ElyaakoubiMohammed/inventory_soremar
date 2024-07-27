@@ -73,23 +73,18 @@ class _FormulairePageState extends State<FormulairePage> {
     final productName = _productController.text;
     final productDescription = _productDesController.text;
 
-    try {
-      // Start NFC session and get the tag
-      final tag = await _nfcService.startNfcSession();
-      if (tag != null) {
-        // Write data to the NFC tag
-        await _nfcService.writeFormData(
-          tag,
-          productName: productName,
-          productDescription: productDescription,
-        );
-        _showSuccessDialog(context);
-      } else {
-        _showErrorDialog(context, 'No NFC tag detected.');
-      }
-    } catch (e) {
-      print('Failed to write NFC tag: $e');
-      _showErrorDialog(context, e.toString());
+    // Start NFC session and get the tag
+    final tag = await _nfcService.startNfcSession();
+    if (tag != null) {
+      // Write data to the NFC tag
+      await _nfcService.writeFormData(
+        tag,
+        productName: productName,
+        productDescription: productDescription,
+      );
+      _showSuccessDialog(context);
+    } else {
+      _showErrorDialog(context, 'No NFC tag detected.');
     }
   }
 
