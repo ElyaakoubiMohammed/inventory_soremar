@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:animations/animations.dart';
+import 'package:soremar_inventory/screens/scan_page.dart';
 //import '../services/nfc_service.dart';
 import 'Formulaire_page.dart';
 
@@ -32,80 +33,7 @@ class HomePageState extends State<HomePage>
     super.dispose();
   }
 
-/*
-  void _onReadNFC(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Scan NFC'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              'assets/images/scan.gif',
-              height: 100,
-              width: 100,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // Close dialog
-            },
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                List<String> data = await _nfcService.readNfcTag(context);
-                if (data.isNotEmpty) {
-                  print("NFC Data: $data");
-                  Navigator.of(context).pop();
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('NFC Data'),
-                      content: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: data.map((payload) => Text(payload)).toList(),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('OK'),
-                        ),
-                      ],
-                    ),
-                  );
-                } else {
-                  print("No data found on NFC tag.");
-                }
-              } catch (e) {
-                print("Error reading NFC: $e");
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Error'),
-                    content: Text('Error reading NFC: $e'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('OK'),
-                      ),
-                    ],
-                  ),
-                );
-              }
-            },
-            child: const Text('Scan'),
-          ),
-        ],
-      ),
-    );
-  }
-
+  /*
   void _onWriteNFC(BuildContext context) {
     showDialog(
       context: context,
@@ -151,6 +79,7 @@ class HomePageState extends State<HomePage>
     );
   }
   */
+
   void _navigateToFormulairePage(BuildContext context) {
     Navigator.push(
       context,
@@ -166,7 +95,7 @@ class HomePageState extends State<HomePage>
           Container(
             decoration: const BoxDecoration(
               image: DecorationImage(
-                image: AssetImage('assets/images/backgroundimage.jpeg'),
+                image: AssetImage('assets/images/back.jpeg'),
                 fit: BoxFit.cover,
               ),
             ),
@@ -234,8 +163,7 @@ class HomePageState extends State<HomePage>
                               ),
                             ),
                             openBuilder: (context, closeContainer) =>
-                                const Center(
-                                    child: Text('Veuillez scannez la tag...')),
+                                const ScanTagPage(), // Updated to ScanTagPage
                           ),
                         ),
                         const SizedBox(height: 150), // Increased space

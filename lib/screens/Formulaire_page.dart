@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-//import 'package:soremar_inventory/screens/details.dart';
-//import 'package:soremar_inventory/services/nfc_service.dart';
-import 'package:soremar_inventory/Widgets/my_text_field.dart';
+import 'package:soremar_inventory/services/nfc_service.dart';
+import 'package:soremar_inventory/widgets/my_text_field.dart';
 
 class FormulairePage extends StatefulWidget {
   static const String path = '/formulaire';
@@ -15,7 +14,7 @@ class FormulairePage extends StatefulWidget {
 class _FormulairePageState extends State<FormulairePage> {
   final _productController = TextEditingController();
   final _productDesController = TextEditingController();
-  //final NfcService _nfcService = NfcService();
+  final NfcService _nfcService = NfcService();
 
   @override
   void dispose() {
@@ -58,7 +57,7 @@ class _FormulairePageState extends State<FormulairePage> {
     return OutlinedButton(
       style: OutlinedButton.styleFrom(minimumSize: const Size(200, 50)),
       onPressed: () {
-        _showConfirmationDialog(context);
+        _submitForm(context);
       },
       child: Text(
         "Submit Form".toUpperCase(),
@@ -70,27 +69,43 @@ class _FormulairePageState extends State<FormulairePage> {
     );
   }
 
-  void _showConfirmationDialog(BuildContext context) {
+  void _submitForm(BuildContext context) async {
+    final productName = _productController.text;
+    final productDescription = _productDesController.text;
+
+    try {
+      // Start NFC session and get the tag
+      final tag = await _nfcService.startNfcSession();
+      if (tag != null) {
+        // Write data to the NFC tag
+        await _nfcService.writeFormData(
+          tag,
+          productName: productName,
+          productDescription: productDescription,
+        );
+        _showSuccessDialog(context);
+      } else {
+        _showErrorDialog(context, 'No NFC tag detected.');
+      }
+    } catch (e) {
+      print('Failed to write NFC tag: $e');
+      _showErrorDialog(context, e.toString());
+    }
+  }
+
+  void _showSuccessDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Confirmation'),
-          content: const Text('Are you sure you want to submit the form?'),
+          title: const Text('Success'),
+          content: const Text('Data written to NFC tag successfully.'),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Remove or comment out the following line to prevent form submission
-                // _submitForm(context);
-              },
-              child: const Text('Confirm'),
+              child: const Text('OK'),
             ),
           ],
         );
@@ -98,31 +113,23 @@ class _FormulairePageState extends State<FormulairePage> {
     );
   }
 
-  // Remove or comment out this method if no actions should be taken
-  // void _submitForm(BuildContext context) async {
-  //   try {
-  //     await _nfcService.writeNfcTag(
-  //       'Product Name: ${_productController.text}\n'
-  //       'Product Description: ${_productDesController.text}',
-  //     );
-  //     _navigateToDetails(context);
-  //   } catch (e) {
-  //     print('Failed to write NFC tag: $e');
-  //   }
-  // }
-/*
-  void _navigateToDetails(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) {
-          return Details(
-            productName: _productController.text,
-            productDescription: _productDesController.text,
-          );
-        },
-      ),
+  void _showErrorDialog(BuildContext context, String error) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Error'),
+          content: Text('Failed to write NFC tag: $error'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
     );
   }
-  */
 }

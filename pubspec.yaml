@@ -44,6 +44,9 @@ dependencies:
   app_settings: ^5.1.1
   animations: ^2.0.11
   flutter_animate: ^4.5.0
+  convert: ^3.1.1
+  flutter_nfc_kit: ^3.5.2
+  flutter_lints: ^4.0.0
 
 dev_dependencies:
   flutter_test:
@@ -54,7 +57,6 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^3.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -82,8 +84,7 @@ flutter:
   # https://flutter.dev/assets-and-images/#from-packages
   assets:
    - assets/images/
-   - assets/images/editing.gif
-   - assets/images/soremar.jpg
+   - assets/images/back.jpeg
   # To add custom fonts to your application, add a fonts section here,
   # in this "flutter" section. Each entry in this list should have a
   # "family" key with the font family name, and a "fonts" key with a

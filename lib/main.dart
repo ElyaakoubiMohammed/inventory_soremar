@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:nfc_manager/nfc_manager.dart';
 import 'package:soremar_inventory/screens/NFCUnavailablepage.dart';
 import 'screens/home_page.dart';
 import 'screens/login_page.dart';
 import 'screens/formulaire_page.dart';
 import 'screens/profilepage.dart';
-import 'package:nfc_manager/nfc_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,13 +22,15 @@ Future<bool> checkNfcAvailability() async {
 
 class MyApp extends StatelessWidget {
   final bool nfcAvailable;
+
   const MyApp({super.key, required this.nfcAvailable});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Soremar Inventory',
-      initialRoute: LoginPage.path,
+      initialRoute: nfcAvailable ? LoginPage.path : ErrorPage.path,
       theme: ThemeData(
         primarySwatch: Colors.deepPurple,
       ),
@@ -37,9 +39,9 @@ class MyApp extends StatelessWidget {
         HomePage.path: (context) => const HomePage(),
         FormulairePage.path: (context) => const FormulairePage(),
         ErrorPage.path: (context) => const ErrorPage(
-              errorMessage: 'NFC is not available on this device ',
+              errorMessage: 'NFC is not available on this device',
             ),
-        ProfilePage1.path: (context) => const ProfilePage1()
+        ProfilePage1.path: (context) => const ProfilePage1(),
       },
     );
   }
