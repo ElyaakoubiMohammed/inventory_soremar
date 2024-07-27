@@ -13,11 +13,7 @@ void main() async {
 }
 
 Future<bool> checkNfcAvailability() async {
-  try {
-    return await NfcManager.instance.isAvailable();
-  } catch (e) {
-    return false;
-  }
+  return await NfcManager.instance.isAvailable();
 }
 
 class MyApp extends StatelessWidget {
