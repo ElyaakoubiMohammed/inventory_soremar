@@ -1,112 +1,69 @@
 import 'dart:typed_data';
 import 'dart:async';
-import 'package:flutter/material.dart';
 import 'package:nfc_manager/nfc_manager.dart';
-import 'package:nfc_manager/platform_tags.dart';
 
 class NfcService {
-  /// Checks if NFC is available on the device
-  Future<bool> isNfcAvailable() async {
-    return await NfcManager.instance.isAvailable();
-  }
-
-  /// Starts an NFC session and listens for NFC tags
   Future<NfcTag?> startNfcSession() async {
-    Completer<NfcTag?> completer = Completer();
-
-    NfcManager.instance.startSession(
-      onDiscovered: (NfcTag tag) async {
-        completer.complete(tag);
-        NfcManager.instance.stopSession();
-      },
-    );
-
-    return completer.future;
+    NfcTag? discoveredTag;
+    await NfcManager.instance.startSession(onDiscovered: (NfcTag tag) async {
+      discoveredTag = tag;
+      await NfcManager.instance.stopSession();
+    });
+    return discoveredTag;
   }
 
-  /// Writes form data to an NFC tag
-  Future<void> writeFormData(
-    NfcTag tag, {
-    required String productName,
-    required String productDescription,
-  }) async {
-    if (tag.data.containsKey('mifareultralight')) {
-      var mifareUltralight = MifareUltralight.from(tag);
-
-      if (mifareUltralight != null) {
-        // Prepare data
-        String dataToWrite = '$productName\n$productDescription';
-        List<int> data = dataToWrite.codeUnits; // Convert string to bytes
-
-        // MifareUltralight write requires the page number and data to be written
-        for (int i = 0; i < data.length; i += 4) {
-          final pageData = Uint8List(4)
-            ..setAll(
-                0, data.sublist(i, i + 4 > data.length ? data.length : i + 4));
-
-          // Write data to page
-          await mifareUltralight.transceive(
-            data: Uint8List.fromList(
-                [0xA2, i ~/ 4, ...pageData]), // 0xA2 is the WRITE command
-          );
-        }
-
-        debugPrint('Data written successfully');
-      } else {
-        debugPrint('MifareUltralight instance is null');
-      }
+  Future<String> readTagData(NfcTag tag) async {
+    if (tag.data.containsKey('mifareUltralight')) {
+      return await readUltralightData(tag);
     } else {
-      debugPrint('Unsupported card type');
+      return 'Unsupported NFC tag type';
     }
   }
 
-  /// Reads data from an NFC tag
-  Future<Map<String, dynamic>> readTagData() async {
-    Completer<Map<String, dynamic>> completer = Completer();
-    NfcTag? tag;
-
-    NfcManager.instance.startSession(
-      onDiscovered: (NfcTag discoveredTag) async {
-        tag = discoveredTag;
-        NfcManager.instance.stopSession();
-
-        final data = await _readTag(tag);
-        completer.complete(data);
-      },
-    );
-
-    return completer.future;
+  Future<String> readUltralightData(NfcTag tag) async {
+    var nfcA = tag.data['nfcA'];
+    final result =
+        await nfcA.transceive(Uint8List.fromList([0x30, 0x00])); // Read command
+    return String.fromCharCodes(result);
   }
+/*
+  Future<String> readMifareClassicData(NfcTag tag) async {
+    try {
+      var mifareClassic = tag.data['mifareClassic'];
+      final nfcA = mifareClassic['nfcA'];
 
-  /// Helper method to read data from an NFC tag
-  Future<Map<String, dynamic>> _readTag(NfcTag? tag) async {
-    Map<String, dynamic> tagData = {};
+      // Authenticate with Key A (0x60) or Key B (0x61)
+      // Example authentication command, you should replace with actual key
+      final authCommand = Uint8List.fromList(
+          [0x60, 0x00, 0x00, 0x00, 0x00, 0x00]); // Placeholder
+      final authResult = await nfcA.transceive(authCommand);
 
-    if (tag == null) {
-      throw Exception('No tag detected');
-    }
-
-    if (tag.data.containsKey('mifareultralight')) {
-      var mifareUltralight = MifareUltralight.from(tag);
-
-      if (mifareUltralight != null) {
-        // Read data from multiple pages
-        List<int> allData = [];
-        for (int i = 4; i < 8; i++) {
-          final response = await mifareUltralight.transceive(
-            data: Uint8List.fromList([0x30, i]), // 0x30 is the READ command
-          );
-          allData.addAll(response.sublist(0, 4)); // Each page is 4 bytes
-        }
-
-        tagData['data'] = String.fromCharCodes(allData).trim();
+      if (authResult[0] == 0x90) {
+        // Authentication success
+        // Read a specific sector (e.g., Sector 0)
+        final readCommand = Uint8List.fromList([0x30, 0x00]); // Read command
+        final readResult = await nfcA.transceive(readCommand);
+        return String.fromCharCodes(readResult);
       } else {
-        tagData['data'] = 'Unsupported tag type';
+        return 'Authentication failed';
       }
-    } else {
-      tagData['data'] = 'Unsupported tag type';
+    } catch (e) {
+      return 'Error reading MIFARE Classic data: $e';
     }
-
-    return tagData;
   }
+
+  Future<String> readNtagData(NfcTag tag) async {
+    try {
+      var ntag = tag.data['ntag'];
+      final nfcA = ntag['nfcA'];
+      
+      // Read a specific page (e.g., Page 0)
+      final readCommand = Uint8List.fromList([0x30, 0x00]); // Read command
+      final readResult = await nfcA.transceive(readCommand);
+      return String.fromCharCodes(readResult);
+    } catch (e) {
+      return 'Error reading NTAG data: $e';
+    }
+  }
+  */
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:soremar_inventory/services/nfc_service.dart';
+import 'package:nfc_manager/nfc_manager.dart';
 
 class ScanTagPage extends StatefulWidget {
   const ScanTagPage({super.key});
@@ -9,7 +10,10 @@ class ScanTagPage extends StatefulWidget {
 }
 
 class ScanTagPageState extends State<ScanTagPage> {
-  Future<Map<String, dynamic>>? _scanResult;
+  bool _isScanning = false;
+  String _scanMessage =
+      'Placez votre téléphone près de l\'étiquette NFC pour scanner.';
+
   final NfcService _nfcService = NfcService();
 
   @override
@@ -48,62 +52,84 @@ class ScanTagPageState extends State<ScanTagPage> {
   }
 
   void _showScanDialog(BuildContext context) {
-    setState(() {
-      _scanResult = _startNfcScan();
-    });
-
     showDialog(
       context: context,
       barrierDismissible: false, // Prevents closing dialog by tapping outside
-      builder: (context) => AlertDialog(
-        title: const Text('Scan NFC'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              'assets/images/scan.gif', // Ensure the path is correct
-              height: 100,
-              width: 100,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-                'Placez votre téléphone près de l\'étiquette NFC pour scanner.'),
-            FutureBuilder<Map<String, dynamic>>(
-              future: _scanResult,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const CircularProgressIndicator();
-                } else if (snapshot.hasError) {
-                  return Text('Error: ${snapshot.error}');
-                } else if (snapshot.hasData) {
-                  final tagData = snapshot.data;
-                  final data = tagData?['data'] ?? 'No data';
-                  return Text('Data: $data');
-                } else {
-                  return const Text('No tag detected.');
-                }
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // Close dialog
-            },
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
+      builder: (context) {
+        _startNfcScan();
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Scan NFC'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    'assets/images/scan.gif', // Ensure the path is correct
+                    height: 100,
+                    width: 100,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(_scanMessage),
+                  if (_isScanning) const CircularProgressIndicator(),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    _stopNfcScan();
+                    Navigator.of(context).pop(); // Close dialog
+                  },
+                  child: const Text('Cancel'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
-  Future<Map<String, dynamic>> _startNfcScan() async {
-    final tag = await _nfcService.startNfcSession();
-    if (tag != null) {
-      return await _nfcService.readTagData();
-    } else {
-      return {'data': 'No tag detected.'};
+  Future<void> _startNfcScan() async {
+    setState(() {
+      _isScanning = true;
+      _scanMessage =
+          'Placez votre téléphone près de l\'étiquette NFC pour scanner.';
+    });
+
+    try {
+      final tag = await _nfcService.startNfcSession();
+      if (tag != null) {
+        final data = await _nfcService.readUltralightData(tag);
+        setState(() {
+          _scanMessage = 'Data: $data';
+        });
+      } else {
+        setState(() {
+          _scanMessage = 'No tag detected.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _scanMessage = 'Error: $e';
+      });
+    } finally {
+      setState(() {
+        _isScanning = false;
+      });
     }
+  }
+
+  void _stopNfcScan() {
+    NfcManager.instance.stopSession();
+    setState(() {
+      _isScanning = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    _stopNfcScan();
+    super.dispose();
   }
 }
