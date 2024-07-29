@@ -15,6 +15,8 @@ class NfcService {
   Future<String> readTagData(NfcTag tag) async {
     if (tag.data.containsKey('mifareUltralight')) {
       return await readUltralightData(tag);
+    } else if (tag.data.containsKey('ndef')) {
+      return await readNdefData(tag);
     } else {
       return 'Unsupported NFC tag type';
     }
@@ -26,7 +28,26 @@ class NfcService {
         await nfcA.transceive(Uint8List.fromList([0x30, 0x00])); // Read command
     return String.fromCharCodes(result);
   }
-/*
+
+  Future<String> readNdefData(NfcTag tag) async {
+    try {
+      var ndef = tag.data['ndef'];
+      final cachedMessage = ndef['cachedMessage'];
+
+      if (cachedMessage != null) {
+        final records = cachedMessage['records'] as List<dynamic>;
+        final record = records.first;
+        final payload = record['payload'] as Uint8List;
+        return String.fromCharCodes(payload);
+      } else {
+        return 'No NDEF message found';
+      }
+    } catch (e) {
+      return 'Error reading NDEF data: $e';
+    }
+  }
+
+  /*
   Future<String> readMifareClassicData(NfcTag tag) async {
     try {
       var mifareClassic = tag.data['mifareClassic'];

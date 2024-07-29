@@ -56,9 +56,9 @@ class ScanTagPageState extends State<ScanTagPage> {
       context: context,
       barrierDismissible: false, // Prevents closing dialog by tapping outside
       builder: (context) {
-        _startNfcScan();
         return StatefulBuilder(
           builder: (context, setState) {
+            _startNfcScan(setState);
             return AlertDialog(
               title: const Text('Scan NFC'),
               content: Column(
@@ -90,7 +90,7 @@ class ScanTagPageState extends State<ScanTagPage> {
     );
   }
 
-  Future<void> _startNfcScan() async {
+  Future<void> _startNfcScan(StateSetter setState) async {
     setState(() {
       _isScanning = true;
       _scanMessage =
@@ -103,18 +103,17 @@ class ScanTagPageState extends State<ScanTagPage> {
         final data = await _nfcService.readUltralightData(tag);
         setState(() {
           _scanMessage = 'Data: $data';
+          _isScanning = false;
         });
       } else {
         setState(() {
           _scanMessage = 'No tag detected.';
+          _isScanning = false;
         });
       }
     } catch (e) {
       setState(() {
         _scanMessage = 'Error: $e';
-      });
-    } finally {
-      setState(() {
         _isScanning = false;
       });
     }
