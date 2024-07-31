@@ -1,90 +1,144 @@
-import 'dart:typed_data';
-import 'dart:async';
 import 'package:nfc_manager/nfc_manager.dart';
+import 'package:nfc_manager/platform_tags.dart';
+import 'dart:typed_data';
 
 class NfcService {
-  Future<NfcTag?> startNfcSession() async {
-    NfcTag? discoveredTag;
-    await NfcManager.instance.startSession(onDiscovered: (NfcTag tag) async {
-      discoveredTag = tag;
-      await NfcManager.instance.stopSession();
-    });
-    return discoveredTag;
-  }
+  final NfcManager _nfcManager = NfcManager.instance;
+  bool _isScanning = false;
 
-  Future<String> readTagData(NfcTag tag) async {
-    if (tag.data.containsKey('mifareUltralight')) {
-      return await readUltralightData(tag);
-    } else if (tag.data.containsKey('ndef')) {
-      return await readNdefData(tag);
-    } else {
-      return 'Unsupported NFC tag type';
-    }
-  }
+  Future<void> eraseTag() async {
+    if (_isScanning) return;
 
-  Future<String> readUltralightData(NfcTag tag) async {
-    var nfcA = tag.data['nfcA'];
-    final result =
-        await nfcA.transceive(Uint8List.fromList([0x30, 0x00])); // Read command
-    return String.fromCharCodes(result);
-  }
+    _isScanning = true;
 
-  Future<String> readNdefData(NfcTag tag) async {
     try {
-      var ndef = tag.data['ndef'];
-      final cachedMessage = ndef['cachedMessage'];
+      await _nfcManager.startSession(
+        onDiscovered: (NfcTag tag) async {
+          try {
+            final nfca = NfcA.from(tag);
+            if (nfca != null) {
+              try {
+                // Erase all pages (typically up to 48)
+                for (int page = 0; page < 48; page++) {
+                  final writeCommand = Uint8List.fromList([
+                    0xA2, // Write command
+                    page, // Page number
+                    0x00, 0x00, 0x00, 0x00 // Data (zeros)
+                  ]);
 
-      if (cachedMessage != null) {
-        final records = cachedMessage['records'] as List<dynamic>;
-        final record = records.first;
-        final payload = record['payload'] as Uint8List;
-        return String.fromCharCodes(payload);
-      } else {
-        return 'No NDEF message found';
-      }
+                  final response = await nfca.transceive(data: writeCommand);
+
+                  if (response.isEmpty) {
+                    print('Failed to write zeros to page $page');
+                  } else {
+                    print('Successfully wrote zeros to page $page');
+                  }
+
+                  // Debug: Print the response from the tag
+                  String hexResponse = response
+                      .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+                      .join(' ');
+                  print('Page $page response (hex): $hexResponse');
+                }
+              } catch (e) {
+                print('Error erasing tag: ${e.toString()}');
+              }
+            } else {
+              print('NFC A tag not found.');
+            }
+          } catch (e) {
+            print('Error accessing NFC tag: ${e.toString()}');
+          } finally {
+            _isScanning = false;
+          }
+        },
+      );
     } catch (e) {
-      return 'Error reading NDEF data: $e';
+      print('Error starting NFC session: ${e.toString()}');
+      _isScanning = false;
     }
   }
 
-  /*
-  Future<String> readMifareClassicData(NfcTag tag) async {
+  Future<void> startScanning(
+    Function(String) onDataRead,
+    Function(String) onError,
+  ) async {
+    if (_isScanning) return;
+
+    _isScanning = true;
+
     try {
-      var mifareClassic = tag.data['mifareClassic'];
-      final nfcA = mifareClassic['nfcA'];
+      await _nfcManager.startSession(
+        onDiscovered: (NfcTag tag) async {
+          try {
+            final nfca = NfcA.from(tag);
+            if (nfca != null) {
+              try {
+                const int startPage = 6;
+                const int endPage = 7;
+                StringBuffer allData = StringBuffer();
 
-      // Authenticate with Key A (0x60) or Key B (0x61)
-      // Example authentication command, you should replace with actual key
-      final authCommand = Uint8List.fromList(
-          [0x60, 0x00, 0x00, 0x00, 0x00, 0x00]); // Placeholder
-      final authResult = await nfcA.transceive(authCommand);
+                for (int page = startPage; page < endPage; page++) {
+                  try {
+                    final response = await nfca.transceive(
+                      data: Uint8List.fromList([0x30, page]), // READ command
+                    );
 
-      if (authResult[0] == 0x90) {
-        // Authentication success
-        // Read a specific sector (e.g., Sector 0)
-        final readCommand = Uint8List.fromList([0x30, 0x00]); // Read command
-        final readResult = await nfcA.transceive(readCommand);
-        return String.fromCharCodes(readResult);
-      } else {
-        return 'Authentication failed';
-      }
+                    // Log raw data in hexadecimal format
+                    String hexData = response
+                        .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+                        .join(' ');
+                    print('Page $page raw data (hex): $hexData');
+
+                    // Convert response bytes to a string
+                    String pageData = String.fromCharCodes(response);
+
+                    // Append the page data to the buffer
+                    allData.write(pageData);
+                  } catch (e) {
+                    print('Error reading page $page: ${e.toString()}');
+                  }
+                }
+
+                // Convert collected data to text and filter out unwanted characters
+                String collectedData = allData.toString();
+                String filteredData = _removeUnwantedCharacters(collectedData);
+
+                // Pass the filtered data to onDataRead
+                onDataRead(filteredData);
+              } catch (e) {
+                onError('Error in transceive operation: ${e.toString()}');
+              }
+            } else {
+              onError('NFC A tag not found.');
+            }
+          } catch (e) {
+            onError('Error reading NFC tag: ${e.toString()}');
+          }
+        },
+      );
     } catch (e) {
-      return 'Error reading MIFARE Classic data: $e';
+      onError('Error starting NFC session: ${e.toString()}');
+    } finally {
+      _isScanning = false;
     }
   }
 
-  Future<String> readNtagData(NfcTag tag) async {
-    try {
-      var ntag = tag.data['ntag'];
-      final nfcA = ntag['nfcA'];
-      
-      // Read a specific page (e.g., Page 0)
-      final readCommand = Uint8List.fromList([0x30, 0x00]); // Read command
-      final readResult = await nfcA.transceive(readCommand);
-      return String.fromCharCodes(readResult);
-    } catch (e) {
-      return 'Error reading NTAG data: $e';
+  String _removeUnwantedCharacters(String data) {
+    // Define the unwanted prefix or character
+    String unwantedPrefix = 'n'; // The character you want to remove
+
+    // Remove the unwanted character if it appears at the beginning
+    if (data.startsWith(unwantedPrefix)) {
+      return data.substring(unwantedPrefix.length);
+    }
+    return data;
+  }
+
+  void stopScanning() {
+    if (_isScanning) {
+      _nfcManager.stopSession();
+      _isScanning = false;
     }
   }
-  */
 }

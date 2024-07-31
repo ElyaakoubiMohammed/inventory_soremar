@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:soremar_inventory/services/nfc_service.dart';
-import 'package:nfc_manager/nfc_manager.dart';
 
 class ScanTagPage extends StatefulWidget {
   const ScanTagPage({super.key});
@@ -10,11 +9,10 @@ class ScanTagPage extends StatefulWidget {
 }
 
 class ScanTagPageState extends State<ScanTagPage> {
+  final NfcService _nfcService = NfcService();
   bool _isScanning = false;
   String _scanMessage =
       'Placez votre téléphone près de l\'étiquette NFC pour scanner.';
-
-  final NfcService _nfcService = NfcService();
 
   @override
   Widget build(BuildContext context) {
@@ -41,9 +39,16 @@ class ScanTagPageState extends State<ScanTagPage> {
           ),
           // Foreground content
           Center(
-            child: ElevatedButton(
-              onPressed: () => _showScanDialog(context),
-              child: const Text('Cliquez ici pour scanner une tag NFC'),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton(
+                  onPressed: _startReadingTag,
+                  child: const Text('Lire l\'étiquette NFC'),
+                ),
+                if (_isScanning) const CircularProgressIndicator(),
+                Text(_scanMessage),
+              ],
             ),
           ),
         ],
@@ -51,84 +56,44 @@ class ScanTagPageState extends State<ScanTagPage> {
     );
   }
 
-  void _showScanDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Prevents closing dialog by tapping outside
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            _startNfcScan(setState);
-            return AlertDialog(
-              title: const Text('Scan NFC'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Image.asset(
-                    'assets/images/scan.gif', // Ensure the path is correct
-                    height: 100,
-                    width: 100,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(_scanMessage),
-                  if (_isScanning) const CircularProgressIndicator(),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    _stopNfcScan();
-                    Navigator.of(context).pop(); // Close dialog
-                  },
-                  child: const Text('Cancel'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
+  Future<void> _startReadingTag() async {
+    if (_isScanning) return; // Prevent starting multiple operations
 
-  Future<void> _startNfcScan(StateSetter setState) async {
     setState(() {
       _isScanning = true;
-      _scanMessage =
-          'Placez votre téléphone près de l\'étiquette NFC pour scanner.';
+      _scanMessage = 'Lecture en cours...';
     });
 
     try {
-      final tag = await _nfcService.startNfcSession();
-      if (tag != null) {
-        final data = await _nfcService.readUltralightData(tag);
-        setState(() {
-          _scanMessage = 'Data: $data';
-          _isScanning = false;
-        });
-      } else {
-        setState(() {
-          _scanMessage = 'No tag detected.';
-          _isScanning = false;
-        });
-      }
+      await _nfcService.startScanning(
+        (data) {
+          setState(() {
+            _scanMessage = 'Hex Data: $data';
+          });
+          _stopScan();
+        },
+        (error) {
+          setState(() {
+            _scanMessage = 'Error: $error';
+          });
+          _stopScan();
+        },
+      );
     } catch (e) {
       setState(() {
-        _scanMessage = 'Error: $e';
-        _isScanning = false;
+        _scanMessage = 'Error: ${e.toString()}';
       });
+    } finally {
+      _stopScan(); // Ensure the session is stopped in the finally block
     }
+
+    return; // Explicitly return to satisfy the return type of Future<void>
   }
 
-  void _stopNfcScan() {
-    NfcManager.instance.stopSession();
+  void _stopScan() {
+    _nfcService.stopScanning();
     setState(() {
       _isScanning = false;
     });
-  }
-
-  @override
-  void dispose() {
-    _stopNfcScan();
-    super.dispose();
   }
 }
