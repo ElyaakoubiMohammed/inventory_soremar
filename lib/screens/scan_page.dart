@@ -46,7 +46,15 @@ class ScanTagPageState extends State<ScanTagPage> {
                   onPressed: _startReadingTag,
                   child: const Text('Lire l\'étiquette NFC'),
                 ),
+                SizedBox(height: 16), // Add some spacing between buttons
+                ElevatedButton(
+                  onPressed: _eraseTag,
+                  child: const Text('Effacer l\'étiquette NFC'),
+                ),
+                SizedBox(height: 16),
+
                 if (_isScanning) const CircularProgressIndicator(),
+                SizedBox(height: 16),
                 Text(_scanMessage),
               ],
             ),
@@ -86,8 +94,28 @@ class ScanTagPageState extends State<ScanTagPage> {
     } finally {
       _stopScan(); // Ensure the session is stopped in the finally block
     }
+  }
 
-    return; // Explicitly return to satisfy the return type of Future<void>
+  Future<void> _eraseTag() async {
+    if (_isScanning) return; // Prevent starting multiple operations
+
+    setState(() {
+      _isScanning = true;
+      _scanMessage = 'Étiquette effacement en cours...';
+    });
+
+    try {
+      await _nfcService.eraseTag();
+      setState(() {
+        _scanMessage = 'Étiquette effacée avec succès.';
+      });
+    } catch (e) {
+      setState(() {
+        _scanMessage = 'Error: ${e.toString()}';
+      });
+    } finally {
+      _stopScan(); // Ensure the session is stopped in the finally block
+    }
   }
 
   void _stopScan() {
