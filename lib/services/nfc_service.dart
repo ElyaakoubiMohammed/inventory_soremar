@@ -30,13 +30,17 @@ class NfcService {
                   ]);
 
                   final response = await nfca.transceive(data: writeCommand);
-                  print('Page $page write response: ${response.toHex()}');
 
                   if (response.isEmpty) {
                     print('Failed to write zeros to page $page');
                   } else {
                     print('Successfully wrote zeros to page $page');
                   }
+
+                  String hexResponse = response
+                      .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+                      .join(' ');
+                  print('Page $page response (hex): $hexResponse');
                 }
 
                 completer.complete();
@@ -79,8 +83,9 @@ class NfcService {
             final nfca = NfcA.from(tag);
             if (nfca != null) {
               try {
-                const int startPage = 6;
-                final int endPage = await _calculateEndPage(nfca);
+                const int startPage = 6; // Start reading from page 6
+                final int endPage = await _calculateEndPage(
+                    nfca); // Determine end page dynamically
                 StringBuffer allData = StringBuffer();
 
                 for (int page = startPage; page < endPage; page++) {
@@ -89,8 +94,10 @@ class NfcService {
                       data: Uint8List.fromList([0x30, page]), // READ command
                     );
 
-                    // Log raw bytes and data
-                    print('Page $page raw bytes: ${response.toHex()}');
+                    // Print raw bytes for debugging
+                    print(
+                        'Page $page raw bytes: ${response.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join(' ')}');
+
                     String pageData = String.fromCharCodes(response);
                     print('Page $page data: $pageData');
 
@@ -103,6 +110,7 @@ class NfcService {
                 String collectedData = allData.toString();
                 String filteredData = _removeUnwantedCharacters(collectedData);
 
+                // Log the filtered data
                 print('Filtered data: $filteredData');
 
                 onDataRead(filteredData);
@@ -126,6 +134,7 @@ class NfcService {
 
   Future<int> _calculateEndPage(NfcA nfca) async {
     // Implement this function based on your NFC tag's capacity
+    // This is a placeholder for the actual logic to determine the end page
     return 40; // Default end page, adjust if necessary
   }
 
@@ -178,33 +187,13 @@ class NfcService {
             final nfca = NfcA.from(tag);
             if (nfca != null) {
               try {
+                // Clear previous data by writing zeros
+                await _clearTag(nfca);
+
+                // Convert strings to byte arrays
                 List<int> productNameBytes = utf8.encode(productName);
                 List<int> productDescriptionBytes =
                     utf8.encode(productDescription);
-
-                // Helper function to write data to a page
-                Future<void> writePage(int page, List<int> dataBytes) async {
-                  // Pad the data to 4 bytes if necessary
-                  List<int> pageData = List<int>.filled(4, 0x00);
-                  for (int i = 0; i < dataBytes.length; i++) {
-                    pageData[i] = dataBytes[i];
-                  }
-
-                  final writeCommand = Uint8List.fromList([
-                    0xA2, // Write command
-                    page, // Page number
-                    ...pageData,
-                  ]);
-
-                  final response = await nfca.transceive(data: writeCommand);
-                  print('Page $page write response: ${response.toHex()}');
-
-                  if (response.isEmpty) {
-                    print('Failed to write data to page $page');
-                  } else {
-                    print('Successfully wrote data to page $page');
-                  }
-                }
 
                 // Starting page for writing
                 int startPage = 6;
@@ -212,26 +201,48 @@ class NfcService {
                 // Write productName
                 for (int i = 0; i < productNameBytes.length; i += 4) {
                   int page = startPage + (i ~/ 4);
-                  List<int> pageData = productNameBytes.sublist(
-                    i,
-                    (i + 4 > productNameBytes.length)
-                        ? productNameBytes.length
-                        : i + 4,
-                  );
-                  await writePage(page, pageData);
+                  Uint8List writeCommand = Uint8List.fromList([
+                    0xA2, // Write command
+                    page, // Page number
+                    ...productNameBytes.sublist(
+                        i,
+                        i + 4 > productNameBytes.length
+                            ? productNameBytes.length
+                            : i + 4),
+                  ]);
+
+                  final response = await nfca.transceive(data: writeCommand);
+
+                  if (response.isEmpty) {
+                    print('Failed to write product name to page $page');
+                  } else {
+                    print('Successfully wrote product name to page $page');
+                  }
                 }
 
-                // Write productDescription on subsequent pages
-                startPage += (productNameBytes.length / 4).ceil();
+                // Continue writing productDescription on subsequent pages
+                startPage += (productNameBytes.length / 4)
+                    .ceil(); // Update startPage to be after the productName pages
                 for (int i = 0; i < productDescriptionBytes.length; i += 4) {
                   int page = startPage + (i ~/ 4);
-                  List<int> pageData = productDescriptionBytes.sublist(
-                    i,
-                    (i + 4 > productDescriptionBytes.length)
-                        ? productDescriptionBytes.length
-                        : i + 4,
-                  );
-                  await writePage(page, pageData);
+                  Uint8List writeCommand = Uint8List.fromList([
+                    0xA2, // Write command
+                    page, // Page number
+                    ...productDescriptionBytes.sublist(
+                        i,
+                        i + 4 > productDescriptionBytes.length
+                            ? productDescriptionBytes.length
+                            : i + 4),
+                  ]);
+
+                  final response = await nfca.transceive(data: writeCommand);
+
+                  if (response.isEmpty) {
+                    print('Failed to write product description to page $page');
+                  } else {
+                    print(
+                        'Successfully wrote product description to page $page');
+                  }
                 }
 
                 completer.complete();
@@ -258,9 +269,26 @@ class NfcService {
       _isScanning = false;
     }
   }
-}
 
-extension on Uint8List {
-  String toHex() =>
-      map((byte) => byte.toRadixString(16).padLeft(2, '0')).join(' ');
+  Future<void> _clearTag(NfcA nfca) async {
+    try {
+      for (int page = 4; page < 40; page++) {
+        final writeCommand = Uint8List.fromList([
+          0xA2, // Write command
+          page, // Page number
+          0x00, 0x00, 0x00, 0x00 // Data (zeros)
+        ]);
+
+        final response = await nfca.transceive(data: writeCommand);
+
+        if (response.isEmpty) {
+          print('Failed to clear page $page');
+        } else {
+          print('Successfully cleared page $page');
+        }
+      }
+    } catch (e) {
+      print('Error clearing tag: ${e.toString()}');
+    }
+  }
 }
